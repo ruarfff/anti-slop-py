@@ -1,0 +1,113 @@
+name: publish
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: publish-main
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  validate-and-publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/anti-slop-python
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.3"
+          enable-cache: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run verification checks
+        run: |
+          uv sync --locked --dev
+          uv run ruff format --check .
+          uv run ruff check .
+          uv run pytest
+          uv run anti-slop-python src tests
+
+      - name: Determine next release version
+        id: release_version
+        run: |
+          python3 - << 'EOF' >> "$GITHUB_OUTPUT"
+          import re
+          import subprocess
+
+          def resolve_version():
+              subprocess.run(["git", "fetch", "--tags", "--force"], capture_output=True)
+
+              head_tags_proc = subprocess.run(
+                  ["git", "tag", "--points-at", "HEAD"],
+                  capture_output=True, text=True, check=True
+              )
+              for tag in head_tags_proc.stdout.splitlines():
+                  tag = tag.strip()
+                  if re.match(r"^v\d+\.\d+\.\d+$", tag):
+                      print(f"tag={tag}")
+                      print(f"version={tag.lstrip('v')}")
+                      print("is_new_tag=false")
+                      return
+
+              tags_proc = subprocess.run(
+                  ["git", "tag", "-l", "v[0-9]*.[0-9]*.[0-9]*", "--sort=-v:refname"],
+                  capture_output=True, text=True, check=True
+              )
+              tags = [t.strip() for t in tags_proc.stdout.splitlines() if t.strip()]
+
+              if not tags:
+                  next_tag = "v0.1.0"
+              else:
+                  latest = tags[0]
+                  match = re.match(r"^v(\d+)\.(\d+)\.(\d+)$", latest)
+                  if match:
+                      major, minor, patch = map(int, match.groups())
+                      next_tag = f"v{major}.{minor}.{patch + 1}"
+                  else:
+                      next_tag = "v0.1.0"
+
+              print(f"tag={next_tag}")
+              print(f"version={next_tag.lstrip('v')}")
+              print("is_new_tag=true")
+
+          resolve_version()
+          EOF
+
+      - name: Create and push git tag
+        if: steps.release_version.outputs.is_new_tag == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "${{ steps.release_version.outputs.tag }}"
+          git push origin "${{ steps.release_version.outputs.tag }}"
+
+      - name: Build distribution packages
+        run: uv build
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.release_version.outputs.tag }}" dist/* \
+            --title "${{ steps.release_version.outputs.tag }}" \
+            --generate-notes
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
