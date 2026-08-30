@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: anti-slop-python
+        name: anti-slop-python
+        entry: uv run anti-slop-python
+        language: system
+        types: [python]
+        exclude: ^examples/

@@ -1,0 +1,10 @@
+[project]
+name = "anti-slop-python-basic-example"
+version = "0.0.0"
+description = "Examples of anti-slop-python diagnostics and preferred designs"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.ruff]
+# This table marks the example as a separate Ruff project. anti-slop-python supplies
+# its Ruff-backed policy defaults without additional configuration.

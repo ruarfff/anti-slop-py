@@ -1,0 +1,6 @@
+interface:
+  display_name: "Install anti-slop-python"
+  short_description: "Install anti-slop-python in Python repositories"
+  default_prompt: "Use $install-anti-slop-python to install and configure anti-slop-python in this repository."
+policy:
+  allow_implicit_invocation: true

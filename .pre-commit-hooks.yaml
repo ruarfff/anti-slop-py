@@ -1,0 +1,6 @@
+- id: anti-slop-python
+  name: anti-slop-python
+  description: Reject Python patterns that weaken architectural evidence.
+  entry: anti-slop-python
+  language: python
+  types: [python]
