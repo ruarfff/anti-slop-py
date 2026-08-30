@@ -1,6 +1,9 @@
 # anti-slop-python
 
+[![PyPI - Version](https://img.shields.io/pypi/v/anti-slop-python)](https://pypi.org/project/anti-slop-python/)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/anti-slop-python)](https://pypi.org/project/anti-slop-python/)
 [![skills.sh](https://skills.sh/b/ruarfff/anti-slop-python)](https://skills.sh/ruarfff/anti-slop-python)
+[![License: MIT](https://img.shields.io/github/license/ruarfff/anti-slop-python)](LICENSE)
 
 `anti-slop-python` is a small, opinionated architectural
 linter for Python inspired by and largely copied from
