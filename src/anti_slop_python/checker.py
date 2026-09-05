@@ -18,7 +18,7 @@ def check_source(source: str, path: str | Path = "<unknown>") -> list[Diagnostic
     except SyntaxError as error:
         return [_syntax_error(source_path, error)]
 
-    context = RuleContext(path=source_path, tree=tree)
+    context = RuleContext(path=source_path, tree=tree, source=source)
     diagnostics = [diagnostic for rule in RULES for diagnostic in rule.check(context)]
     return sorted(diagnostics)
 

@@ -24,6 +24,7 @@ class RuleContext:
 
     path: Path
     tree: ast.AST
+    source: str
     imports: dict[str, str] = field(init=False)
 
     def __post_init__(self) -> None:
