@@ -83,7 +83,9 @@ class Diagnostic:
     column: int
     code: str
     message: str
+    guidance: tuple[str, ...] = ()
 
     def __str__(self) -> str:
         summary = f"{self.path}:{self.line}:{self.column} {self.code} {self.message}"
-        return "\n  ".join((summary, *_GUIDANCE.get(self.code, ())))
+        guidance = self.guidance or _GUIDANCE.get(self.code, ())
+        return "\n  ".join((summary, *guidance))

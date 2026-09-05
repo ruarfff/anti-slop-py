@@ -124,7 +124,7 @@ Native `anti-slop-python` rules cover some checks that Ruff does not provide:
 | --- | --- | --- |
 | SPY001 | `no-any-containers` | `dict`, `list`, `set`, or `tuple` parameterized with `Any` (including their `typing` aliases) |
 | SPY002 | `no-dynamic-attribute-access` | Calls to `getattr()`, `setattr()`, or `delattr()` |
-| SPY003 | `too-many-module-lines` | Modules with more than 500 physical lines |
+| SPY003 | `too-many-module-lines` | Modules over 500 physical lines, or test modules over 1,500; both limits are configurable |
 
 ### Ruff-backed policy
 
@@ -183,7 +183,7 @@ source location. Ruff exclusions apply to Ruff-backed checks. Native SPY rules
 still check every Python file in the paths passed to `anti-slop-python`; use the
 command paths or pre-commit `files`/`exclude` settings to control that scope.
 
-When an override is weaker than the default policy, `anti-slop-python` prints a
+When a Ruff override is weaker than the default policy, `anti-slop-python` prints a
 non-failing policy notice. Stricter settings do not produce a notice. The
 defaults apply only to Ruff runs started by `anti-slop-python`; add the equivalent
 configuration above if a separate `ruff check` command must enforce the same
@@ -250,13 +250,12 @@ the built-ins regardless of whether the name is constant.
 
 ### SPY003 — Limit module size
 
-`SPY003` rejects Python files with more than 500 physical lines. It counts code,
-comments, blank lines, and docstrings. A final newline terminates the last line;
-it does not add another line. The diagnostic appears at line 1 and includes the
-actual count and limit. Like other native rules, this limit is fixed and does
-not support configuration or `noqa` suppression. It applies to every Python file
-in the native check scope, including tests. Files with syntax errors report the
-syntax error instead of native rule diagnostics.
+`SPY003` allows 500 physical lines per production module and 1,500 per test
+module by default. It counts code, comments, blank lines, and docstrings. A
+final newline terminates the last line; it does not add another line. The
+diagnostic appears at line 1 and includes the actual count and active limit.
+Files with syntax errors report the syntax error instead of native diagnostics.
+Native rules do not support `noqa` suppression.
 
 For incremental adoption, see [Exclude specific files during adoption](#exclude-specific-files-during-adoption).
 
@@ -274,6 +273,57 @@ a clear purpose and interface. Keep closely related code together, minimize
 shared state and cross-module calls, and avoid circular imports. Moving unrelated
 code into a generic helpers module does not improve the design. Preserve public
 APIs and verify behavior after changing the boundaries.
+
+#### Test modules and configuration
+
+Test modules can contain many independent scenarios, fixtures, and deliberate
+repetition. Their larger budget helps keep related cases together. Files named
+`test_*.py`, `*_test.py`, or `conftest.py` use the test limit automatically,
+at any directory depth. Names are case-sensitive. Importing `pytest` or using
+assertions does not change a file's classification. A helper such as
+`tests/helpers.py` uses the production limit unless a configured pattern matches.
+
+Set the limits and add test-helper paths in `pyproject.toml`:
+
+```toml
+[tool.anti-slop-python]
+max-module-lines = 500
+max-test-module-lines = 1500
+test-file-patterns = ["tests/**", "specs/**"]
+```
+
+Limits must be positive integers. Patterns extend the automatic filename
+conventions; an empty list keeps only those conventions. Patterns are matched
+against the complete, case-sensitive path relative to this `pyproject.toml`,
+using `/` separators. They use shell-style matching: `*` can span directories,
+so `tests/**` includes both immediate and nested files. Absolute paths and `..`
+segments are rejected. Patterns cannot classify files outside the configuration
+directory as tests.
+
+For each source file, the checker searches its directory and parents for the
+nearest `[tool.anti-slop-python]` table. A nested `pyproject.toml` without this
+table inherits the parent settings. A nearer table replaces the parent table;
+omitted options use the defaults above. This works for direct file arguments,
+directory scans, and pre-commit, regardless of the current working directory.
+Invalid options stop the CLI with exit code 2.
+
+Only the module-size budget changes for tests. Other native and Ruff-backed
+rules still apply. Oversized tests receive guidance specific to test design:
+
+```text
+tests/test_orders.py:1:1 SPY003 Too many lines in test module (1620 > 1500)
+  Group tests by the behavior or component they verify.
+  Keep each scenario readable and preserve assertions and edge cases.
+  Do not remove coverage, compress cases, or hide setup in shared fixtures
+  merely to satisfy this limit.
+```
+
+For Python callers, `check_file()` discovers configuration automatically.
+`check_source()` uses defaults without reading configuration files; pass a
+`ModuleSizeSettings` instance from `anti_slop_python.configuration` with its
+`settings=` argument to supply custom values. The `root` field sets the base
+directory for additional test patterns. Invalid file configuration raises
+`ConfigurationError` when calling `check_file()` directly.
 
 ### ANN — Keep function contracts explicit
 
@@ -404,7 +454,7 @@ When reading diagnostics through the Python API, `message` contains the summary;
 | `ANN` | Declare real parameter and return types; preserve existing type information |
 | `SPY001` | Describe and validate the actual data instead of hiding `Any` |
 | `SPY002` | Use explicit interfaces and preserve missing-value behavior |
-| `SPY003` | Separate module responsibilities while keeping related code together |
+| `SPY003` | Separate production responsibilities or group tests by behavior; preserve related code and test coverage |
 | `C901` | Simplify decisions while preserving edge cases |
 | `PLR0915` | Extract meaningful steps while preserving ordering and side effects |
 | `TID251` | Follow the project's API policy; pass dependencies when test isolation is needed |
@@ -448,7 +498,8 @@ uv run anti-slop-python examples/basic_project
 
 Native checks use Python's built-in `ast` and a pragmatic import alias map.
 They do not perform scope-aware name resolution, type checking, cross-file
-analysis, configuration, suppressions, or autofixes. Ruff-backed checks use
+analysis, suppressions, or autofixes. Native configuration currently covers only
+module-size limits and additional test-file patterns. Ruff-backed checks use
 the project's effective Ruff configuration and suppression behavior.
 
 ## Releases
